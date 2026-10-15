@@ -1,0 +1,67 @@
+name: Update REA
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable version to package, for example 6.5.0"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-rea
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Update and validate package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$REQUESTED_VERSION" ]; then
+            ./scripts/update.sh "$REQUESTED_VERSION"
+          else
+            ./scripts/update.sh
+          fi
+
+      - name: Commit update
+        id: commit
+        run: |
+          if git diff --quiet; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          version="$(sed -n 's/^  version = "\([^"]*\)";/\1/p' packages/rea.nix)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/rea.nix packages/rea-package-lock.json README.md
+          git commit -m "chore: update rea to ${version}"
+          git push
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize
+        run: |
+          if [ "${{ steps.commit.outputs.updated }}" = "true" ]; then
+            echo "Updated rea to ${{ steps.commit.outputs.version }}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "rea is already up to date." >> "$GITHUB_STEP_SUMMARY"
+          fi
