@@ -12,15 +12,15 @@
 
 buildNpmPackage (finalAttrs: {
   pname = "rea";
-  version = "6.5.0";
+  version = "6.7.0";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/rea-agents/-/rea-agents-${finalAttrs.version}.tgz";
-    hash = "sha256-UxcXoG6SymUaq1JpEZD5FvrARCcsAfh14ixeKTIY5pk=";
+    hash = "sha256-IJWKZtuhoBHlCkhr65Rjo0MSjtNoyYT5QGU2LBP1H5A=";
   };
 
   nodejs = nodejs_24;
-  npmDepsHash = "sha256-eVR13/QlwI7zbgDa9Wo/AcKmwvRwsKY2QJZoCfiQrwA=";
+  npmDepsHash = "sha256-kC+eHVXWJuHqIb5kROP7P672L8jfw/K1ovipokPWOmg=";
 
   nativeBuildInputs = [ makeWrapper ];
 
