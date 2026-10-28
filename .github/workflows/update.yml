@@ -41,6 +41,9 @@ jobs:
             ./scripts/update.sh
           fi
 
+      - name: Validate current package even when unchanged
+        run: nix flake check --print-build-logs
+
       - name: Commit update
         id: commit
         run: |
