@@ -35,6 +35,9 @@ main() {
     exit 0
   fi
 
+  # Releases can raise the minimum supported Node patch version.
+  nix flake update nixpkgs
+
   tarball_url="$(npm view "${NPM_PACKAGE}@${version}" dist.tarball)"
   src_hash="$(nix store prefetch-file --json "$tarball_url" | jq -r .hash)"
 
@@ -42,9 +45,13 @@ main() {
   work_dir="$(mktemp -d)"
   trap "rm -rf '${work_dir}'" EXIT
   curl --silent --show-error --fail --location "$tarball_url" | tar -xz -C "$work_dir"
+  # npm gives the published shrinkwrap precedence over package-lock.json.
+  # Generate our own lock for the dependency set used by the Nix build.
+  rm -f "$work_dir/package/npm-shrinkwrap.json"
+  rm -rf "$work_dir/package/node_modules"
   jq 'del(.optionalDependencies, .devDependencies)' "$work_dir/package/package.json" >"$work_dir/package.json"
   mv "$work_dir/package.json" "$work_dir/package/package.json"
-  (cd "$work_dir/package" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null)
+  (cd "$work_dir/package" && npm install --package-lock-only --package-lock=true --ignore-scripts --no-audit --no-fund >/dev/null)
   cp "$work_dir/package/package-lock.json" packages/rea-package-lock.json
   deps_hash="$(nix run nixpkgs#prefetch-npm-deps -- packages/rea-package-lock.json 2>/dev/null)"
   [[ "$deps_hash" == sha256-* ]] || fail "could not compute the npm dependency hash"
@@ -62,7 +69,7 @@ main() {
     -e "s|./scripts/update.sh ${current_version}|./scripts/update.sh ${version}|g" \
     README.md
 
-  nix fmt packages/rea.nix
+  nix fmt -- packages/rea.nix
   nix flake check --print-build-logs
   nix run . -- --version | grep -Fx "${version}"
   printf 'Updated REA from %s to %s.\n' "$current_version" "$version"
